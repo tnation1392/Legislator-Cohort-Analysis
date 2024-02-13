@@ -1,0 +1,7 @@
+-- A basic retention model for the number of terms served by each legislator over time --
+SELECT id_bioguide
+,min(term_start) as first_term
+FROM legislators_terms 
+GROUP BY 1
+;
+
