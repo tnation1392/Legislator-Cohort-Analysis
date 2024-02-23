@@ -1,0 +1,36 @@
+-- Finding first and last term by using min() and max() --
+SELECT id_bioguide
+,min(term_start) as first_term
+,max(term_start) as last_term
+FROM legislators_terms
+GROUP BY 1
+;
+
+-- Calculating tenure by number of years served --
+SELECT id_bioguide
+,date_part('century',min(term_start)) as first_century
+,min(term_start) as first_term
+,max(term_start) as last_term
+,date_part('year',age(max(term_start),min(term_start))) as tenure
+FROM legislators_terms
+GROUP BY 1
+;
+
+-- Calculating survival of ten years serving from each cohort --
+SELECT first_century
+,count(distinct id_bioguide) as cohort_size
+,count(distinct case when tenure >= 10 then id_bioguide end) as survived_10
+,count(distinct case when tenure >= 10 then id_bioguide end) * 1.0 
+ / count(distinct id_bioguide) as pct_survived_10
+FROM
+(
+        SELECT id_bioguide
+        ,date_part('century',min(term_start)) as first_century
+        ,min(term_start) as first_term
+        ,max(term_start) as last_term
+        ,date_part('year',age(max(term_start),min(term_start))) as tenure
+        FROM legislators_terms
+        GROUP BY 1
+) a
+GROUP BY 1
+;
