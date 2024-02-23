@@ -70,3 +70,65 @@ FROM
         ) aa
 ) aaa
 GROUP BY 1
+
+-- Adjusting the time series window to increase retention accuracy --
+SELECT a.id_bioguide, a.first_term
+,b.term_start, b.term_end
+,c.date
+,date_part('year',age(c.date,a.first_term)) as period
+FROM
+(
+        SELECT id_bioguide, min(term_start) as first_term
+        FROM legislators_terms 
+        GROUP BY 1
+) a
+JOIN legislators_terms b on a.id_bioguide = b.id_bioguide 
+LEFT JOIN date_dim c on c.date between b.term_start and b.term_end 
+and c.month_name = 'December' and c.day_of_month = 31
+;
+
+-- Calculating cohort retained for each period --
+SELECT coalesce(date_part('year',age(c.date,a.first_term)),0) as period
+,count(distinct a.id_bioguide) as cohort_retained
+FROM
+(
+        SELECT id_bioguide, min(term_start) as first_term
+        FROM legislators_terms 
+        GROUP BY 1
+) a
+JOIN legislators_terms b on a.id_bioguide = b.id_bioguide 
+LEFT JOIN date_dim c on c.date between b.term_start and b.term_end 
+and c.month_name = 'December' and c.day_of_month = 31
+GROUP BY 1
+;
+
+-- Calculate cohort size and pct retained --
+SELECT first_year
+, period
+,first_value(cohort_retained) over (partition by first_year order by period) as cohort_size
+,cohort_retained
+,round(cohort_retained * 1.0 / first_value(cohort_retained) over (partition by first_year order by period),2) as pct_retained
+FROM
+(
+        SELECT date_part('year',first_term) as first_year
+        ,date_part('year',age(b.term_start,a.first_term)) as period
+        ,count(distinct a.id_bioguide) as cohort_retained
+        FROM
+        (
+                SELECT id_bioguide
+                ,min(term_start) as first_term
+                FROM legislators_terms 
+                GROUP BY 1
+        ) a
+        JOIN legislators_terms b on a.id_bioguide = b.id_bioguide 
+        GROUP BY 1,2
+) aa
+;
+
+-- Retention by legislator term type --
+SELECT distinct id_bioguide, term_type, date('2000-01-01') as first_term
+,min(term_start) as min_start
+FROM legislators_terms 
+WHERE term_start <= '2000-12-31' and term_end >= '2000-01-01'
+GROUP BY 1,2,3
+;
