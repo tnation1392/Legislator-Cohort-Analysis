@@ -1,0 +1,118 @@
+-- Cohort size of reps in each century --
+SELECT date_part('century',a.first_term)::int as cohort_century
+,count(id_bioguide) as reps
+FROM
+(
+        SELECT id_bioguide, min(term_start) as first_term
+        FROM legislators_terms
+        WHERE term_type = 'rep'
+        GROUP BY 1
+) a
+GROUP BY 1
+;
+
+-- Finding percentages of legislators that were reps and became senators in centuries --
+SELECT aa.cohort_century
+,bb.rep_and_sen * 1.0 / aa.reps as pct_rep_and_sen
+FROM
+(
+        SELECT date_part('century',a.first_term) as cohort_century
+        ,count(id_bioguide) as reps
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) a
+        GROUP BY 1
+) aa
+LEFT JOIN
+(
+        SELECT date_part('century',b.first_term) as cohort_century
+        ,count(distinct b.id_bioguide) as rep_and_sen
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) b
+        JOIN legislators_terms c on b.id_bioguide = c.id_bioguide
+        and c.term_type = 'sen' and c.term_start > b.first_term
+        GROUP BY 1
+) bb on aa.cohort_century = bb.cohort_century
+;
+
+-- Looking at percentages of reps --> senators with a viewing window of ten years --
+SELECT aa.cohort_century
+,bb.rep_and_sen * 1.0 / aa.reps as pct_rep_and_sen
+FROM
+(
+        SELECT date_part('century',a.first_term) as cohort_century
+        ,count(id_bioguide) as reps
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) a
+        WHERE first_term <= '2009-12-31'
+        GROUP BY 1
+) aa
+LEFT JOIN
+(
+        SELECT date_part('century',b.first_term) as cohort_century
+        ,count(distinct b.id_bioguide) as rep_and_sen
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) b
+        JOIN legislators_terms c on b.id_bioguide = c.id_bioguide
+        and c.term_type = 'sen' and c.term_start > b.first_term
+        WHERE age(c.term_start, b.first_term) <= interval '10 years'
+        GROUP BY 1
+) bb on aa.cohort_century = bb.cohort_century
+;
+
+-- Using multiple viewing windows on terms--
+SELECT aa.cohort_century::int as cohort_century
+,round(bb.rep_and_sen_5_yrs * 1.0 / aa.reps,4) as pct_5_yrs
+,round(bb.rep_and_sen_10_yrs * 1.0 / aa.reps,4) as pct_10_yrs
+,round(bb.rep_and_sen_15_yrs * 1.0 / aa.reps,4) as pct_15_yrs
+FROM
+(
+        SELECT date_part('century',a.first_term) as cohort_century
+        ,count(id_bioguide) as reps
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) a
+        WHERE first_term <= '2009-12-31'
+        GROUP BY 1
+) aa
+LEFT JOIN
+(
+        SELECT date_part('century',b.first_term) as cohort_century
+        ,count(distinct case when age(c.term_start, b.first_term) <= interval '5 years' then b.id_bioguide end) as rep_and_sen_5_yrs
+        ,count(distinct case when age(c.term_start, b.first_term) <= interval '10 years' then b.id_bioguide end) as rep_and_sen_10_yrs
+        ,count(distinct case when age(c.term_start, b.first_term) <= interval '15 years' then b.id_bioguide end) as rep_and_sen_15_yrs
+        FROM
+        (
+                SELECT id_bioguide, min(term_start) as first_term
+                FROM legislators_terms
+                WHERE term_type = 'rep'
+                GROUP BY 1
+        ) b
+        JOIN legislators_terms c on b.id_bioguide = c.id_bioguide
+        and c.term_type = 'sen' and c.term_start > b.first_term
+        GROUP BY 1
+) bb on aa.cohort_century = bb.cohort_century
+;
