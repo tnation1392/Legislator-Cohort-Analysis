@@ -34,3 +34,43 @@ FROM
 ) a
 GROUP BY 1
 ;
+
+-- Share of legislators from each century that lasted 5 terms --
+SELECT first_century
+,count(distinct id_bioguide) as cohort_size
+,count(distinct case when total_terms >= 5 then id_bioguide end) as survived_5
+,count(distinct case when total_terms >= 5 then id_bioguide end) * 1.0
+ / count(distinct id_bioguide) as pct_survived_5_terms
+FROM
+(
+        SELECT id_bioguide
+        ,date_part('century',min(term_start)) as first_century
+        ,count(term_start) as total_terms
+        FROM legislators_terms
+        GROUP BY 1
+) a
+GROUP BY 1
+;
+
+-- Calculating term survival amount per century --
+SELECT a.first_century
+,b.terms
+,count(distinct id_bioguide) as cohort
+,count(distinct case when a.total_terms >= b.terms then id_bioguide end) as cohort_survived
+,count(distinct case when a.total_terms >= b.terms then id_bioguide end) * 1.0 
+ / count(distinct id_bioguide) as pct_survived
+FROM
+(
+        SELECT id_bioguide
+        ,date_part('century',min(term_start)) as first_century
+        ,count(term_start) as total_terms
+        FROM legislators_terms
+        GROUP BY 1
+) a
+JOIN
+(
+        SELECT generate_series as terms 
+        FROM generate_series(1,20,1)
+) b on 1 = 1
+GROUP BY 1,2
+;
